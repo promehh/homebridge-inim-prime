@@ -1,13 +1,13 @@
 {
   "displayName": "Homebridge INIM Prime",
   "name": "homebridge-inim-prime",
-  "version": "0.1.1",
-  "description": "Homebridge plugin for INIM alarm systems (Prime, SmartLiving) via INIM Cloud. WebSocket real-time updates and optional SIA-IP local push.",
+  "version": "0.1.3",
+  "description": "Plugin Homebridge per centrali antifurto INIM (Prime, Prime60, SmartLiving) via INIM Cloud. Aggiornamenti real-time via WebSocket e supporto opzionale SIA-IP locale. Espone allarme totale, aree, scenari e zone su HomeKit.",
   "license": "MIT",
   "keywords": ["homebridge-plugin", "homekit", "inim", "inim-cloud", "prime", "prime60", "smartliving", "alarm", "security", "alarm-system"],
   "engines": {
-    "node": "^18.17.0 || ^20.9.0 || ^22.0.0",
-    "homebridge": "^1.6.0 || ^2.0.0-beta.0"
+    "node": ">=18.17.0",
+    "homebridge": ">=1.6.0"
   },
   "main": "dist/src/index.js",
   "scripts": {

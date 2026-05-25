@@ -1,18 +1,11 @@
 #!/usr/bin/env node
 /**
- * Standalone connection test.
+ * Standalone connection test for the INIM Cloud + plugin.
  *
- * Usage:
  *   INIM_USER=you@example.com INIM_PASS=cloudpass node dist/scripts/test-connection.js
- *   # or
  *   node dist/scripts/test-connection.js --user you@example.com --pass cloudpass [--ws]
  *
- * Prints all device/area/zone/scenario IDs so you can fill in sceneMapping
- * in Homebridge config.json. Optionally opens the WebSocket for 60s to verify
- * real-time events.
- *
- * Run on the Raspberry Pi: useful as a first-step diagnostic, completely
- * independent from Homebridge.
+ * Prints device/area/scenario/zone IDs so you can fill sceneMapping in config.
  */
 
 import { InimClient } from '../src/inimClient';
@@ -33,9 +26,7 @@ async function main() {
   const verbose = process.argv.includes('--verbose') || process.argv.includes('-v');
 
   if (!user || !pass) {
-    console.error(
-      'Missing credentials. Pass them via --user / --pass or INIM_USER / INIM_PASS env vars.',
-    );
+    console.error('Missing credentials. Pass --user / --pass or set INIM_USER / INIM_PASS.');
     process.exit(2);
   }
 
@@ -48,10 +39,9 @@ async function main() {
 
   if (wantPoll) {
     log.info('Step 2/3: RequestPoll for all devices, wait 5s…');
-    // We don't have device IDs yet — do an initial getDevicesExtended first.
     const initial = await client.getDevicesExtended();
     if (initial.length === 0) {
-      log.warn('No devices returned by INIM Cloud. Check that your account has paired panels.');
+      log.warn('No devices returned. Check that your account has paired panels.');
       process.exit(1);
     }
     await client.pollAndWait(initial.map((d) => d.DeviceId));
@@ -72,15 +62,9 @@ async function main() {
     console.log('');
     console.log(`  Areas (${d.Areas.length}):`);
     for (const a of d.Areas) {
-      const armedLabel =
-        a.Armed === 1
-          ? 'ARMED'
-          : a.Armed === 4
-          ? 'disarmed'
-          : `partial(${a.Armed})`;
+      const armedLabel = a.Armed === 1 ? 'ARMED' : a.Armed === 4 ? 'disarmed' : `partial(${a.Armed})`;
       console.log(
-        `    - AreaId=${a.AreaId}  name="${a.Name}"  ${armedLabel}` +
-          (a.Alarm ? '  !!! ALARM !!!' : ''),
+        `    - AreaId=${a.AreaId}  name="${a.Name}"  ${armedLabel}` + (a.Alarm ? '  !!! ALARM !!!' : ''),
       );
     }
     console.log('');
@@ -94,9 +78,16 @@ async function main() {
     for (const z of d.Zones) {
       const stateLabel = z.Status === 2 ? 'OPEN' : 'closed';
       const bypass = z.Bypassed ? '  (bypassed)' : '';
+      // Some panels return Areas as a single int/bitmask rather than an array;
+      // normalise defensively so the script never crashes.
+      const areasRaw = (z as { Areas?: unknown }).Areas;
+      const areasStr = Array.isArray(areasRaw)
+        ? areasRaw.join(',')
+        : areasRaw == null
+          ? ''
+          : String(areasRaw);
       console.log(
-        `    - ZoneId=${z.ZoneId}  name="${z.Name}"  ${stateLabel}` +
-          `  areas=[${(z.Areas ?? []).join(',')}]${bypass}`,
+        `    - ZoneId=${z.ZoneId}  name="${z.Name}"  ${stateLabel}  areas=[${areasStr}]${bypass}`,
       );
     }
   }
