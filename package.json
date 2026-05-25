@@ -23,6 +23,6 @@
     "typescript": "^5.4.0"
   },
   "files": ["dist", "config.schema.json", "LICENSE", "NOTICE", "README.md"],
-  "repository": { "type": "git", "url": "git+https://github.com/REPLACE_WITH_YOUR_USERNAME/homebridge-inim-prime.git" },
-  "bugs": { "url": "https://github.com/REPLACE_WITH_YOUR_USERNAME/homebridge-inim-prime/issues" }
+  "repository": { "type": "git", "url": "git+https://github.com/promehh/homebridge-inim-prime.git" },
+  "bugs": { "url": "https://github.com/promehh/homebridge-inim-prime/issues" }
 }
