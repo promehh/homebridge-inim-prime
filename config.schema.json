@@ -1,0 +1,127 @@
+{
+  "pluginAlias": "InimPrime",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "Plugin per centrali INIM (Prime, Prime60, SmartLiving) via INIM Cloud. Espone allarme totale, aree, scenari e zone su HomeKit. Real-time via WebSocket. Vedi il README per la configurazione su Raspberry Pi.",
+  "footerDisplay": "Per supporto apri una issue su GitHub.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Nome",
+        "type": "string",
+        "default": "INIM Prime",
+        "required": true,
+        "description": "Nome con cui il bridge si presenta in Homebridge."
+      },
+      "username": {
+        "title": "Username INIM Cloud",
+        "type": "string",
+        "required": true,
+        "description": "Email dell'account INIM Home / InimCloud."
+      },
+      "password": {
+        "title": "Password INIM Cloud",
+        "type": "string",
+        "required": true,
+        "description": "Password dell'account INIM Home.",
+        "x-schema-form": { "type": "password" }
+      },
+      "userCode": {
+        "title": "Codice utente (PIN della centrale)",
+        "type": "string",
+        "required": true,
+        "description": "Il PIN utente della centrale (NON la password del cloud). Serve per inserire/disinserire aree e bypassare zone."
+      },
+      "pollIntervalSeconds": {
+        "title": "Intervallo polling REST (s)",
+        "type": "integer",
+        "default": 60,
+        "minimum": 15,
+        "maximum": 3600,
+        "description": "Ogni quanti secondi fare il refresh completo via REST come fallback. WebSocket fornisce comunque aggiornamenti real-time."
+      },
+      "zoneMapping": {
+        "title": "Mappatura zone",
+        "type": "string",
+        "default": "auto",
+        "oneOf": [
+          { "title": "Auto (consigliato) - euristica su nome zona", "enum": ["auto"] },
+          { "title": "Contact Sensor per tutte le zone", "enum": ["contact"] },
+          { "title": "Motion Sensor per tutte le zone", "enum": ["motion"] },
+          { "title": "Nessuna zona esposta", "enum": ["none"] }
+        ],
+        "description": "Come esporre le zone su HomeKit. 'Auto' usa parole chiave nel nome (porta/finestra/PIR) per scegliere Contact o Motion."
+      },
+      "exposeExtraSceneSwitches": {
+        "title": "Switch extra per ogni scenario",
+        "type": "boolean",
+        "default": true,
+        "description": "Crea uno switch HomeKit aggiuntivo per ogni scenario configurato (oltre al Security System nativo). Comodo per attivare scenari da Siri."
+      },
+      "areaMode": {
+        "title": "Modalita aree",
+        "type": "string",
+        "default": "perArea",
+        "oneOf": [
+          { "title": "Un Security System per ogni area (consigliato)", "enum": ["perArea"] },
+          { "title": "Solo Security System globale", "enum": ["globalOnly"] },
+          { "title": "Globale + switch per area", "enum": ["globalPlusSwitches"] }
+        ]
+      },
+      "sceneMapping": {
+        "title": "Mappatura scenari -> stati HomeKit",
+        "type": "object",
+        "description": "Quale scenario corrisponde a Stay (Casa), Away (Fuori) e Night (Notte). Lascia vuoto per la mappatura automatica (primo scenario disinserimento = disarm, primo armamento totale = away, ecc.).",
+        "properties": {
+          "stayScenarioId": {
+            "title": "ID scenario Stay (Casa)",
+            "type": "integer",
+            "description": "ID dello scenario INIM da mappare a Stay/Home."
+          },
+          "awayScenarioId": {
+            "title": "ID scenario Away (Fuori)",
+            "type": "integer",
+            "description": "ID dello scenario INIM da mappare a Away (allarme totale)."
+          },
+          "nightScenarioId": {
+            "title": "ID scenario Night (Notte)",
+            "type": "integer",
+            "description": "ID dello scenario INIM da mappare a Night."
+          },
+          "disarmScenarioId": {
+            "title": "ID scenario Disarm",
+            "type": "integer",
+            "description": "ID dello scenario INIM che disinserisce tutto."
+          }
+        }
+      },
+      "useSiaIp": {
+        "title": "Abilita SIA-IP locale",
+        "type": "boolean",
+        "default": false,
+        "description": "Riceve eventi push locali dalla centrale (richiede configurazione della centrale: SmartLeague -> indirizzo IP della Raspberry, porta scelta sotto). Se non sai cos'e, lascia disattivato: il WebSocket basta."
+      },
+      "siaIpPort": {
+        "title": "Porta SIA-IP",
+        "type": "integer",
+        "default": 6001,
+        "minimum": 1024,
+        "maximum": 65535,
+        "condition": { "functionBody": "return model.useSiaIp === true;" }
+      },
+      "siaAccountId": {
+        "title": "Account ID SIA (opzionale)",
+        "type": "string",
+        "description": "Se impostato, scarta gli eventi SIA che non corrispondono a questo account. Lascia vuoto per accettare tutto.",
+        "condition": { "functionBody": "return model.useSiaIp === true;" }
+      },
+      "debug": {
+        "title": "Log verboso (debug)",
+        "type": "boolean",
+        "default": false,
+        "description": "Abilita log dettagliati per debugging (consigliato in fase di prima installazione)."
+      }
+    }
+  }
+}

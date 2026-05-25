@@ -1,0 +1,28 @@
+{
+  "displayName": "Homebridge INIM Prime",
+  "name": "homebridge-inim-prime",
+  "version": "0.1.1",
+  "description": "Homebridge plugin for INIM alarm systems (Prime, SmartLiving) via INIM Cloud. WebSocket real-time updates and optional SIA-IP local push.",
+  "license": "MIT",
+  "keywords": ["homebridge-plugin", "homekit", "inim", "inim-cloud", "prime", "prime60", "smartliving", "alarm", "security", "alarm-system"],
+  "engines": {
+    "node": "^18.17.0 || ^20.9.0 || ^22.0.0",
+    "homebridge": "^1.6.0 || ^2.0.0-beta.0"
+  },
+  "main": "dist/src/index.js",
+  "scripts": {
+    "build": "node -e \"require('fs').rmSync('./dist',{recursive:true,force:true})\" && tsc",
+    "smoke": "node dist/scripts/smoke.js",
+    "test:connection": "node dist/scripts/test-connection.js"
+  },
+  "dependencies": { "ws": "^8.18.0" },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/ws": "^8.5.10",
+    "homebridge": "^1.8.0",
+    "typescript": "^5.4.0"
+  },
+  "files": ["dist", "config.schema.json", "LICENSE", "NOTICE", "README.md"],
+  "repository": { "type": "git", "url": "git+https://github.com/REPLACE_WITH_YOUR_USERNAME/homebridge-inim-prime.git" },
+  "bugs": { "url": "https://github.com/REPLACE_WITH_YOUR_USERNAME/homebridge-inim-prime/issues" }
+}
