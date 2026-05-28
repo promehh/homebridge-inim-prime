@@ -2,6 +2,9 @@
 /**
  * Coordinator: orchestrates REST polling, WebSocket events, and (optional)
  * SIA-IP push, into a single in-memory cache of devices/areas/zones/scenarios.
+ *
+ * Emits change notifications via Node's EventEmitter so accessories can update
+ * HomeKit characteristics without rebuilding the platform.
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.Coordinator = void 0;
@@ -20,29 +23,44 @@ class Coordinator extends events_1.EventEmitter {
         this.sia = null;
         this.stopped = false;
         this.inFlightPoll = null;
-        // Each accessory registers a 'change' listener; with many zones/areas/scenarios
-        // we routinely exceed Node's default cap of 10. Raise it so we don't pollute
-        // logs with MaxListenersExceededWarning.
-        this.setMaxListeners(200);
+        // Each accessory registers a 'change' listener once at startup; with the
+        // listener-leak fix in v0.1.4 these don't accumulate anymore. Keep a safety
+        // margin above Node's default 10 to support installations with many zones.
+        this.setMaxListeners(64);
     }
-    getDevices() { return this.devices; }
+    getDevices() {
+        return this.devices;
+    }
     findArea(deviceId, areaId) {
-        return this.devices.find((d) => d.DeviceId === deviceId)?.Areas.find((a) => a.AreaId === areaId);
+        return this.devices
+            .find((d) => d.DeviceId === deviceId)
+            ?.Areas.find((a) => a.AreaId === areaId);
     }
     findZone(deviceId, zoneId) {
-        return this.devices.find((d) => d.DeviceId === deviceId)?.Zones.find((z) => z.ZoneId === zoneId);
+        return this.devices
+            .find((d) => d.DeviceId === deviceId)
+            ?.Zones.find((z) => z.ZoneId === zoneId);
     }
     findScenario(deviceId, scenarioId) {
-        return this.devices.find((d) => d.DeviceId === deviceId)?.Scenarios.find((s) => s.ScenarioId === scenarioId);
+        return this.devices
+            .find((d) => d.DeviceId === deviceId)
+            ?.Scenarios.find((s) => s.ScenarioId === scenarioId);
     }
+    /**
+     * Initial bootstrap: authenticate, do the first GetDevicesExtended, then
+     * start WS + SIA + polling.
+     */
     async start() {
         this.logger.info('Starting INIM Cloud coordinator…');
         await this.client.authenticate();
+        // First read: no RequestPoll (we don't have device IDs yet).
         this.devices = await this.client.getDevicesExtended();
-        this.logger.info(`Loaded ${this.devices.length} device(s) from INIM Cloud: ` +
-            this.devices.map((d) => `${d.Name} (id=${d.DeviceId})`).join(', '));
+        this.logger.info(`Loaded ${this.devices.length} device(s) from INIM Cloud: ${this.devices
+            .map((d) => `${d.Name} (id=${d.DeviceId})`)
+            .join(', ')}`);
         this.emit('snapshot', this.devices);
         this.emit('change');
+        // Start WS.
         this.ws = new inimWebSocket_1.InimWebSocket({
             logger: this.logger,
             urlProvider: async () => {
@@ -50,13 +68,17 @@ class Coordinator extends events_1.EventEmitter {
                     await this.client.authenticate();
                 return this.client.buildWebSocketUrl();
             },
-            reauthOnReconnect: async () => { await this.client.authenticate(); },
+            reauthOnReconnect: async () => {
+                await this.client.authenticate();
+            },
             onEvent: (evt) => this.applyWsEvent(evt),
             onUnknownEvent: () => {
+                // The HA integration forces a refresh; do the same.
                 this.refreshNow().catch((e) => this.logger.warn(`Forced refresh after WS hint failed: ${e.message}`));
             },
         });
         await this.ws.start();
+        // Start SIA-IP if requested.
         if (this.config.useSiaIp) {
             try {
                 this.sia = new siaServer_1.SiaServer({
@@ -89,10 +111,12 @@ class Coordinator extends events_1.EventEmitter {
                 await this.sia.start();
             }
             catch (e) {
-                this.logger.warn(`SIA-IP listener failed to start: ${e.message}. Continuing without SIA.`);
+                this.logger.warn(`SIA-IP listener failed to start: ${e.message}. ` +
+                    `Continuing without SIA (WebSocket still active).`);
                 this.sia = null;
             }
         }
+        // Start polling loop.
         this.schedulePoll();
     }
     stop() {
@@ -103,12 +127,16 @@ class Coordinator extends events_1.EventEmitter {
         this.ws?.stop();
         this.sia?.stop();
     }
+    /** Trigger an immediate full refresh; safe to call concurrently. */
     async refreshNow() {
         if (this.inFlightPoll)
             return this.inFlightPoll;
-        this.inFlightPoll = this.pollOnce().finally(() => { this.inFlightPoll = null; });
+        this.inFlightPoll = this.pollOnce().finally(() => {
+            this.inFlightPoll = null;
+        });
         return this.inFlightPoll;
     }
+    // ---- internals -------------------------------------------------------
     schedulePoll() {
         if (this.stopped)
             return;
@@ -133,9 +161,10 @@ class Coordinator extends events_1.EventEmitter {
         this.emit('change');
     }
     applyWsEvent(evt) {
-        const device = this.devices.find((d) => d.DeviceId === evt.Device_Id);
+        const targetDeviceId = evt.Device_Id;
+        const device = this.devices.find((d) => d.DeviceId === targetDeviceId);
         if (!device) {
-            this.logger.debug(`WS event for unknown DeviceId=${evt.Device_Id}; forcing refresh.`);
+            this.logger.debug(`WS event for unknown DeviceId=${targetDeviceId}; forcing full refresh.`);
             this.refreshNow().catch(() => undefined);
             return;
         }
@@ -155,7 +184,9 @@ class Coordinator extends events_1.EventEmitter {
             }
         }
         if (changed) {
-            this.logger.debug(`WS event applied to ${device.Name}: ${(evt.ZoneList ?? []).length} zones, ${(evt.AreaList ?? []).length} areas`);
+            this.logger.debug(`WS event applied to device ${device.Name}: ` +
+                `${(evt.ZoneList ?? []).length} zone updates, ` +
+                `${(evt.AreaList ?? []).length} area updates`);
             this.emit('change');
         }
     }

@@ -67,6 +67,11 @@ export class InimPrimePlatform implements DynamicPlatformPlugin {
   private readonly client: InimClient;
   private readonly coordinator: Coordinator;
   private readonly cachedAccessories = new Map<string, PlatformAccessory>();
+  /** UUIDs whose handler has already been attached (subscribed to coordinator events).
+   *  Without this, every call to syncAccessories() would attach a new handler →
+   *  the Coordinator EventEmitter would accumulate one extra 'change' listener per
+   *  accessory per poll cycle, eventually triggering MaxListenersExceededWarning. */
+  private readonly attachedHandlers = new Set<string>();
 
   constructor(
     log: Logging,
@@ -260,7 +265,10 @@ export class InimPrimePlatform implements DynamicPlatformPlugin {
     }
     if (toUnregister.length > 0) {
       this.api.unregisterPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, toUnregister);
-      for (const a of toUnregister) this.cachedAccessories.delete(a.UUID);
+      for (const a of toUnregister) {
+        this.cachedAccessories.delete(a.UUID);
+        this.attachedHandlers.delete(a.UUID);
+      }
       this.logger.info(`Removed ${toUnregister.length} stale accessory(ies).`);
     }
 
@@ -283,7 +291,13 @@ export class InimPrimePlatform implements DynamicPlatformPlugin {
         acc.displayName = name;
       }
       acc.context = { ...ctx };
-      this.attachHandler(env, acc, ctx);
+      // Attach handler ONLY ONCE per accessory UUID. If syncAccessories() runs
+      // again (after a polling refresh or snapshot), skip re-attaching to avoid
+      // accumulating EventEmitter listeners on the Coordinator.
+      if (!this.attachedHandlers.has(uuid)) {
+        this.attachHandler(env, acc, ctx);
+        this.attachedHandlers.add(uuid);
+      }
       if (isNew) {
         this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [acc]);
         this.cachedAccessories.set(uuid, acc);

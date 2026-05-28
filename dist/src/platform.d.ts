@@ -21,6 +21,11 @@ export declare class InimPrimePlatform implements DynamicPlatformPlugin {
     private readonly client;
     private readonly coordinator;
     private readonly cachedAccessories;
+    /** UUIDs whose handler has already been attached (subscribed to coordinator events).
+     *  Without this, every call to syncAccessories() would attach a new handler →
+     *  the Coordinator EventEmitter would accumulate one extra 'change' listener per
+     *  accessory per poll cycle, eventually triggering MaxListenersExceededWarning. */
+    private readonly attachedHandlers;
     constructor(log: Logging, config: PlatformConfig, api: API);
     /** Required by DynamicPlatformPlugin. Called once per cached accessory. */
     configureAccessory(accessory: PlatformAccessory): void;
